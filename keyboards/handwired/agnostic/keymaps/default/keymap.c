@@ -3,6 +3,10 @@
 #include <stdio.h>
 #include <string.h>
 
+
+bool send_keys(uint8_t mods, uint8_t keycode, bool persist_mods, bool return_scan, char* log_message);
+
+
 // Defines names for use in layer keycodes and the keymap
 enum layer_names {
     _OSX,
@@ -215,35 +219,40 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             case _WIN_UTILS:
                 switch (keycode) {
                     case KC_TAB:{
-                        set_mods(MOD_BIT(KC_LALT));
-                        register_code(keycode);
-                        unregister_code(keycode);
-                        uprintf("Attempt ALT+Tab\n");
-                        return false;
+                        return send_keys(
+                            MOD_BIT(KC_LALT),
+                            keycode,
+                            true,
+                            false,
+                            "Attempt ALT+Tab"
+                        );
                     }
                     case KC_R:{
-                        set_mods(MOD_BIT(KC_LGUI));
-                        register_code(keycode);
-                        unregister_code(keycode);
-                        del_mods(MOD_BIT(KC_LGUI));
-                        uprintf("Attempt replace ag+spc with WIN+R\n");
-                        return false;
+                        return send_keys(
+                            MOD_BIT(KC_LGUI),
+                            keycode,
+                            false,
+                            false,
+                            "Attempt WIN+R"
+                        );
                     }
                     case KC_E:{
-                        set_mods(MOD_BIT(KC_LGUI));
-                        register_code(keycode);
-                        unregister_code(keycode);
-                        del_mods(MOD_BIT(KC_LGUI));
-                        uprintf("Attempt replace ag+spc with WIN+E\n");
-                        return false;
+                        return send_keys(
+                            MOD_BIT(KC_LGUI),
+                            keycode,
+                            false,
+                            false,
+                            "Attempt WIN+E"
+                        );
                     }
                     case KC_Q:{
-                        set_mods(MOD_BIT(KC_LALT));
-                        register_code(KC_F4);
-                        unregister_code(KC_F4);
-                        del_mods(MOD_BIT(KC_LALT));
-                        uprintf("Attempt replace ag+spc with ALT+F4\n");
-                        return false;
+                        return send_keys(
+                            MOD_BIT(KC_LALT),
+                            KC_F4,
+                            false,
+                            false,
+                            "Attempt ALT+F4"
+                        );
                     }
                     default :{
                         // add_mods(MOD_BIT(KC_LCTRL));
@@ -298,15 +307,15 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 	return true;
 }
 
-void send_keys(uint8_t mods, uint8_t keycode, bool persist_mods, char* log_message){
+bool send_keys(uint8_t mods, uint8_t keycode, bool persist_mods, bool return_scan, char* log_message){
     set_mods(mods);
     register_code(keycode);
     unregister_code(keycode);
     if (!persist_mods){
         del_mods(mods);
     }
-    uprintf(log_message+"\n");
-    return false;
+    uprintf("%s%s",log_message,"\n");
+    return return_scan;
 }
 
 void led_set_user(uint8_t usb_led) {
