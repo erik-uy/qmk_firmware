@@ -3,10 +3,6 @@
 #include <stdio.h>
 #include <string.h>
 
-
-bool send_keys(uint8_t mods, uint8_t keycode, bool persist_mods, bool return_scan, char* log_message);
-
-
 // Defines names for use in layer keycodes and the keymap
 enum layer_names {
     _OSX,
@@ -17,6 +13,32 @@ enum layer_names {
     _OSX_UTILS,
     _WIN_UTILS,
     _PROGRAMMER
+};
+
+const char* layer_names_strings[] = {"OSX","WIN","Fn","Layers","Macros","OSX Utils","Win Utils","Programmer"};
+
+typedef struct{
+    uint8_t intercept_keycode;
+
+    uint8_t mods;
+    uint8_t replacement_keycode;
+    bool persist_mods;
+    bool return_scan;
+    char* log_message;
+} AGNOSTIC_PARAMS;
+
+
+
+bool send_keys(uint8_t mods, uint8_t keycode, bool persist_mods, bool return_scan, char* log_message);
+bool checkMapping(const AGNOSTIC_PARAMS agnostic_mapping[], uint8_t length, uint8_t keycode);
+
+
+const uint8_t win_agnostic_mapping_size = 4;
+const AGNOSTIC_PARAMS win_agnostic_mapping[] = {
+    { KC_TAB, MOD_BIT(KC_LALT), KC_TAB, true,  false, "Attempt ALT+Tab"},
+    { KC_F4,  MOD_BIT(KC_LALT), KC_F4,  false, false, "Attempt ALT+F4"},
+    { KC_R,   MOD_BIT(KC_LGUI), KC_R,   false, false, "Attempt WIN+R"},
+    { KC_E,   MOD_BIT(KC_LGUI), KC_E,   false, false, "Attempt WIN+E"}
 };
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
@@ -136,40 +158,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
     // Store the current modifier state in the variable for later reference
     mod_state = get_mods();
-    char* layer_name = "";
-
-    switch (get_highest_layer(layer_state)) {
-        case _OSX:
-            layer_name = "OSX";
-            break;
-        case _WIN:
-            layer_name = "WIN";
-            break;
-        case _FUNCTION :{
-            layer_name = "Fn";
-            break;
-        }
-        case _LAYERS :{
-            layer_name = "Layers";
-            break;
-        }
-        case _MACROS :{
-            layer_name = "Macros";
-            break;
-        }
-        case _OSX_UTILS :{
-            layer_name = "OSX Utils";
-            break;
-        }
-        case _WIN_UTILS :{
-            layer_name = "Win Utils";
-            break;
-        }
-        case _PROGRAMMER :{
-            layer_name = "Programmer";
-        }
-
-    }
+    const char* layer_name = layer_names_strings[get_highest_layer(layer_state)];
     #ifdef CONSOLE_ENABLE
         uprintf(
             "KL: %s, AG: %d, kc: 0x%04X, mod: %u, col: %u, row: %u, pressed: %b, time: %u, interrupt: %b, count: %u\n",
@@ -204,67 +193,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
         switch (get_highest_layer(layer_state)) {
             case _OSX:
-                // switch (keycode) {
-                //     case KC_ESC:{
-                //         set_mods(MOD_BIT(KC_GUI));
-                //         register_code(KC_GRV);
-                //         unregister_code(KC_GRV);
-                //         uprintf("Attempt CMD+`\n");
-                //         return false;
-                //     }
-                //     default:{
-                //     }
-                // }
                 break;
-            case _WIN_UTILS:
-                switch (keycode) {
-                    case KC_TAB:{
-                        return send_keys(
-                            MOD_BIT(KC_LALT),
-                            keycode,
-                            true,
-                            false,
-                            "Attempt ALT+Tab"
-                        );
-                    }
-                    case KC_R:{
-                        return send_keys(
-                            MOD_BIT(KC_LGUI),
-                            keycode,
-                            false,
-                            false,
-                            "Attempt WIN+R"
-                        );
-                    }
-                    case KC_E:{
-                        return send_keys(
-                            MOD_BIT(KC_LGUI),
-                            keycode,
-                            false,
-                            false,
-                            "Attempt WIN+E"
-                        );
-                    }
-                    case KC_Q:{
-                        return send_keys(
-                            MOD_BIT(KC_LALT),
-                            KC_F4,
-                            false,
-                            false,
-                            "Attempt ALT+F4"
-                        );
-                    }
-                    default :{
-                        // add_mods(MOD_BIT(KC_LCTRL));
-                        // register_code(keycode);
-                        // unregister_code(keycode);
-                        // uprintf("Attempt CTRL+ 0x%04X\n", keycode);
-                        // return false;
-                    }
-                }
+            case _WIN_UTILS:{
+                return checkMapping( win_agnostic_mapping, win_agnostic_mapping_size, keycode);
                 break;
-            default:{
-                // set_mods(mod_state);
             }
         }
 
@@ -306,6 +238,22 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 	return true;
 }
+
+bool checkMapping(const AGNOSTIC_PARAMS agnostic_mapping[], uint8_t length, uint8_t keycode){
+    uint8_t i;
+    for(i=0;i<length;i++){
+        if (agnostic_mapping[i].intercept_keycode == keycode){
+            return send_keys(
+                agnostic_mapping[i].mods,
+                agnostic_mapping[i].replacement_keycode,
+                agnostic_mapping[i].persist_mods,
+                agnostic_mapping[i].return_scan,
+                agnostic_mapping[i].log_message
+            );
+        }
+    }
+    return true;
+};
 
 bool send_keys(uint8_t mods, uint8_t keycode, bool persist_mods, bool return_scan, char* log_message){
     set_mods(mods);
