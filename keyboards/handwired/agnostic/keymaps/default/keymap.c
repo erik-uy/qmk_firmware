@@ -19,26 +19,32 @@ const char* layer_names_strings[] = {"OSX","WIN","Fn","Layers","Macros","OSX Uti
 
 typedef struct{
     uint8_t intercept_keycode;
-
     uint8_t mods;
+    bool    set_mods;
     uint8_t replacement_keycode;
-    bool persist_mods;
-    bool return_scan;
-    char* log_message;
+    bool    persist_mods;
+    bool    return_scan;
+    char*   log_message;
 } AGNOSTIC_PARAMS;
 
+bool send_keys    (uint8_t mods, bool set_mods, uint8_t keycode, bool persist_mods, bool return_scan, char* log_message);
+bool checkMapping (const AGNOSTIC_PARAMS agnostic_mapping[], uint8_t length, uint8_t keycode);
 
-
-bool send_keys(uint8_t mods, uint8_t keycode, bool persist_mods, bool return_scan, char* log_message);
-bool checkMapping(const AGNOSTIC_PARAMS agnostic_mapping[], uint8_t length, uint8_t keycode);
-
-
-const uint8_t win_agnostic_mapping_size = 4;
+const uint8_t win_agnostic_mapping_size = 5;
 const AGNOSTIC_PARAMS win_agnostic_mapping[] = {
-    { KC_TAB, MOD_BIT(KC_LALT), KC_TAB, true,  false, "Attempt ALT+Tab"},
-    { KC_F4,  MOD_BIT(KC_LALT), KC_F4,  false, false, "Attempt ALT+F4"},
-    { KC_R,   MOD_BIT(KC_LGUI), KC_R,   false, false, "Attempt WIN+R"},
-    { KC_E,   MOD_BIT(KC_LGUI), KC_E,   false, false, "Attempt WIN+E"}
+    { KC_SPC, 0,                true, KC_LGUI, true,  false, "Attempt WIN button" },
+    { KC_TAB, MOD_BIT(KC_LALT), true, KC_TAB,  true,  false, "Attempt ALT+Tab"    },
+    { KC_F4,  MOD_BIT(KC_LALT), true, KC_F4,   false, false, "Attempt ALT+F4"     },
+    { KC_R,   MOD_BIT(KC_LGUI), true, KC_R,    false, false, "Attempt WIN+R"      },
+    { KC_E,   MOD_BIT(KC_LGUI), true, KC_E,    false, false, "Attempt WIN+E"      }
+};
+
+const uint8_t programmer_agnostic_mapping_size = 4;
+const AGNOSTIC_PARAMS programmer_agnostic_mapping[] = {
+    { KC_UP,    0, true, KC_PGUP,   false, false, "Attempt Pageup"   },
+    { KC_DOWN,  0, true, KC_PGDOWN, false, false, "Attempt Pagedown" },
+    { KC_LEFT,  0, true, KC_HOME,   false, false, "Attempt Home"     },
+    { KC_RIGHT, 0, true, KC_END,    false, false, "Attempt End"      }
 };
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
@@ -92,10 +98,10 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 		KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS
     ),
 	[_PROGRAMMER] = LAYOUT( //7
-		RESET, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_DEL,
-		KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO,
-		KC_NO, KC_NO, KC_NO, KC_LBRC, KC_LCBR, KC_LPRN, KC_RPRN, KC_RCBR, KC_RBRC, KC_MINS, KC_EQL, KC_GRV, KC_NO,
-		KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO,
+		KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, RESET,
+		KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_UP, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS,
+		KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_LEFT, KC_DOWN, KC_RIGHT, KC_TRNS, KC_TRNS, KC_TRNS,
+		KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_LBRC, KC_EQL, KC_RBRC, KC_TRNS, KC_TRNS,
 		KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS
     )
 
@@ -190,7 +196,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 
     if (agnostic_state == 1 && record->event.pressed){
-
         switch (get_highest_layer(layer_state)) {
             case _OSX:
                 break;
@@ -198,6 +203,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 return checkMapping( win_agnostic_mapping, win_agnostic_mapping_size, keycode);
                 break;
             }
+            // case _PROGRAMMER:{
+            //     return checkMapping( programmer_agnostic_mapping, programmer_agnostic_mapping_size, keycode);
+            //     break;
+            // }
         }
 
     }else{
@@ -242,9 +251,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 bool checkMapping(const AGNOSTIC_PARAMS agnostic_mapping[], uint8_t length, uint8_t keycode){
     uint8_t i;
     for(i=0;i<length;i++){
+        uprintf("intercepting %d and replacing with %d\n", agnostic_mapping[i].intercept_keycode, keycode);
         if (agnostic_mapping[i].intercept_keycode == keycode){
             return send_keys(
                 agnostic_mapping[i].mods,
+                agnostic_mapping[i].set_mods,
                 agnostic_mapping[i].replacement_keycode,
                 agnostic_mapping[i].persist_mods,
                 agnostic_mapping[i].return_scan,
@@ -255,11 +266,12 @@ bool checkMapping(const AGNOSTIC_PARAMS agnostic_mapping[], uint8_t length, uint
     return true;
 };
 
-bool send_keys(uint8_t mods, uint8_t keycode, bool persist_mods, bool return_scan, char* log_message){
-    set_mods(mods);
+bool send_keys(uint8_t mods, bool bset_mods, uint8_t keycode, bool persist_mods, bool return_scan, char* log_message){
+    if (bset_mods)
+        set_mods(mods);
     register_code(keycode);
     unregister_code(keycode);
-    if (!persist_mods){
+    if (!persist_mods && bset_mods){
         del_mods(mods);
     }
     uprintf("%s%s",log_message,"\n");
