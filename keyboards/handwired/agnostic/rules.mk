@@ -22,3 +22,4 @@ RGBLIGHT_ENABLE = no        # Enable keyboard RGB underglow
 AUDIO_ENABLE = no           # Audio output
 OLED_ENABLE = no
 OLED_DRIVER = SSD1306
+TAP_DANCE_ENABLE = yes
